@@ -1,20 +1,20 @@
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
-
 const tokens = (n) => {
   return ethers.utils.parseUnits(n.toString(), 'ether')
   }
-
 const ether = tokens
 
 describe('Crowdsale', () => {
   // eslint-disable-next-line no-unused-vars
-  let token, crowdsale, deployer, user1, user2, accounts, transaction, whitelist, result, amount, price, value
+  let token, crowdsale, currentTime, startTime, deployer, user1, user2, accounts, transaction, whitelist, result, amount, price, value
 
   beforeEach(async () => {
     const Crowdsale = await ethers.getContractFactory('Crowdsale')
     const Token = await ethers.getContractFactory('Token')
-
+    const currentTime = (await ethers.provider.getBlock('latest')).timestamp
+    
+    startTime = currentTime - 60
     token = await Token.deploy('Dapp University', 'DAPP', '1000000')
 
     accounts = await ethers.getSigners()
@@ -22,7 +22,7 @@ describe('Crowdsale', () => {
     user1 = accounts[1]
     user2 = accounts[2]
 
-    crowdsale = await Crowdsale.deploy(token.address, ether(1), '1000000')
+    crowdsale = await Crowdsale.deploy(token.address, ether(1), '1000000', startTime)
 
     transaction = await token.connect(deployer).transfer(crowdsale.address, tokens(1000000))
     await transaction.wait()
@@ -78,10 +78,16 @@ describe('Crowdsale', () => {
       expect(await crowdsale.token()).to.equal(token.address)
     })
 
+    it('Sets the start time correctly', async () => {
+      expect(await crowdsale.startTime()).to.equal(startTime)
+    })
+    
   })
 
   describe('Buying Tokens', () => {
     amount = tokens(10)
+
+    
 
     describe('Success', () => {
 
@@ -114,7 +120,24 @@ describe('Crowdsale', () => {
       })
 
     })
+    describe('Before start time', () => {
+  
+      it('Should reject token purchases before the crowdsale opens', async () => {
+        await crowdsale.setStartTime((await ethers.provider.getBlock('latest')).timestamp + 60)
+        await expect(crowdsale.connect(user1).buyTokens(amount, { value: ether(10) })
+      ).to.be.revertedWith('Crowdsale has not opened yet')
+      })
 
+    })
+
+    describe('After start time', () => {
+        it('Should allow token purchases after the crowdsale opens', async () => {
+          transaction = await crowdsale.connect(user1).buyTokens(amount, { value: ether(10) })
+          result = await transaction.wait()
+        expect(await token.balanceOf(user1.address)).to.equal(amount);
+      }) 
+
+    })
   })
 
   describe('Sending ETH', () => {
