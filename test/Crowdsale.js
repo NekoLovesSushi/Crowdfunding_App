@@ -9,7 +9,7 @@ const ether = tokens
 
 describe('Crowdsale', () => {
   // eslint-disable-next-line no-unused-vars
-  let token, crowdsale, deployer, user1, accounts, transaction, result, amount, price, value
+  let token, crowdsale, deployer, user1, user2, accounts, transaction, whitelist, result, amount, price, value
 
   beforeEach(async () => {
     const Crowdsale = await ethers.getContractFactory('Crowdsale')
@@ -20,12 +20,49 @@ describe('Crowdsale', () => {
     accounts = await ethers.getSigners()
     deployer = accounts[0]
     user1 = accounts[1]
+    user2 = accounts[2]
 
     crowdsale = await Crowdsale.deploy(token.address, ether(1), '1000000')
 
     transaction = await token.connect(deployer).transfer(crowdsale.address, tokens(1000000))
     await transaction.wait()
+
+    whitelist = await crowdsale.connect(deployer).addToWhitelist(user1.address)
+      result = await whitelist.wait()
+  
   })
+
+    describe('Whitelist Functionality', () => {
+    
+      it('Should add user1 to the whitelist', async () => {
+      whitelist = await crowdsale.connect(deployer).addToWhitelist(user1.address)
+      result = await whitelist.wait()
+
+      const isWhitelisted = await crowdsale.whitelistedAddresses(user1.address)
+      expect(isWhitelisted).to.equal(true)
+      })
+
+      it('Should allow whitelisted users to buy tokens', async () => {
+      await crowdsale.connect(deployer).addToWhitelist(user1.address)
+
+      whitelist = await crowdsale.connect(user1).buyTokens(tokens(10), { value: ether(10) })
+      result = await whitelist.wait()
+
+      expect(await token.balanceOf(user1.address)).to.equal(tokens(10))
+      })
+
+      it('Should reject non-whitelisted users from buying tokens', async () => {
+      await expect(crowdsale.connect(user2).buyTokens(tokens(10), { value: ether(10) })).to.be.revertedWith('You are not whitelisted')
+      })
+
+      it('Should remove a user from the whitelist', async () => {
+      await crowdsale.connect(deployer).addToWhitelist(user2.address)
+      await crowdsale.connect(deployer).removeFromWhitelist(user2.address)
+   
+      await expect(crowdsale.connect(user2).buyTokens(tokens(10), { value: ether(10) })).to.be.revertedWith('You are not whitelisted')
+      })  
+
+    })
 
   describe('Deployment', () => {
 
