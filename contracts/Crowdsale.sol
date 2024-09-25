@@ -11,6 +11,8 @@ contract Crowdsale {
     uint256 public maxTokens;
     uint256 public tokensSold;
     uint256 public startTime;
+    uint256 public minPurchase = 1 * 1e18;
+    uint256 public maxPurchase = 1000 * 1e18;
 
     mapping(address => bool) public whitelistedAddresses;
 
@@ -65,9 +67,16 @@ contract Crowdsale {
     }
 
     function buyTokens(uint256 _amount) public payable onlyWhitelisted onlyWhileOpen {
-        require(msg.value == (_amount / 1e18) * price, "Incorrect ETH value sent");
+        uint256 requiredEth = (_amount * price) / 1e18;
+        console.log("Amount: %s, Required ETH: %s, Sent ETH: %s", _amount, requiredEth, msg.value);
+        
+        require(_amount >= minPurchase, "Minimum purchase is 1 token");
+        require(_amount <= maxPurchase, "Maximum purchase is 1000 tokens");
+        
+        require(msg.value == requiredEth, "Incorrect ETH value sent");
+        
         require(token.balanceOf(address(this)) >= _amount, "Not enough tokens available");
-        require(token.transfer(msg.sender, _amount));
+        require(token.transfer(msg.sender, _amount), "Token transfer failed");
 
         tokensSold += _amount;
 

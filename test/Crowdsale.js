@@ -28,13 +28,12 @@ describe('Crowdsale', () => {
     await transaction.wait()
 
     whitelist = await crowdsale.connect(deployer).addToWhitelist(user1.address)
-      result = await whitelist.wait()
-  
+    result = await whitelist.wait()
   })
 
-    describe('Whitelist Functionality', () => {
+  describe('Whitelist Functionality', () => {
     
-      it('Should add user1 to the whitelist', async () => {
+    it('Should add user1 to the whitelist', async () => {
       whitelist = await crowdsale.connect(deployer).addToWhitelist(user1.address)
       result = await whitelist.wait()
 
@@ -42,7 +41,7 @@ describe('Crowdsale', () => {
       expect(isWhitelisted).to.equal(true)
       })
 
-      it('Should allow whitelisted users to buy tokens', async () => {
+    it('Should allow whitelisted users to buy tokens', async () => {
       await crowdsale.connect(deployer).addToWhitelist(user1.address)
 
       whitelist = await crowdsale.connect(user1).buyTokens(tokens(10), { value: ether(10) })
@@ -51,18 +50,18 @@ describe('Crowdsale', () => {
       expect(await token.balanceOf(user1.address)).to.equal(tokens(10))
       })
 
-      it('Should reject non-whitelisted users from buying tokens', async () => {
+    it('Should reject non-whitelisted users from buying tokens', async () => {
       await expect(crowdsale.connect(user2).buyTokens(tokens(10), { value: ether(10) })).to.be.revertedWith('You are not whitelisted')
       })
 
-      it('Should remove a user from the whitelist', async () => {
+    it('Should remove a user from the whitelist', async () => {
       await crowdsale.connect(deployer).addToWhitelist(user2.address)
       await crowdsale.connect(deployer).removeFromWhitelist(user2.address)
    
       await expect(crowdsale.connect(user2).buyTokens(tokens(10), { value: ether(10) })).to.be.revertedWith('You are not whitelisted')
       })  
 
-    })
+  })
 
   describe('Deployment', () => {
 
@@ -86,8 +85,6 @@ describe('Crowdsale', () => {
 
   describe('Buying Tokens', () => {
     amount = tokens(10)
-
-    
 
     describe('Success', () => {
 
@@ -125,15 +122,17 @@ describe('Crowdsale', () => {
       it('Should reject token purchases before the crowdsale opens', async () => {
         await crowdsale.setStartTime((await ethers.provider.getBlock('latest')).timestamp + 60)
         await expect(crowdsale.connect(user1).buyTokens(amount, { value: ether(10) })
-      ).to.be.revertedWith('Crowdsale has not opened yet')
+        ).to.be.revertedWith('Crowdsale has not opened yet')
       })
 
     })
 
     describe('After start time', () => {
-        it('Should allow token purchases after the crowdsale opens', async () => {
-          transaction = await crowdsale.connect(user1).buyTokens(amount, { value: ether(10) })
-          result = await transaction.wait()
+
+      it('Should allow token purchases after the crowdsale opens', async () => {
+        transaction = await crowdsale.connect(user1).buyTokens(amount, { value: ether(10) })
+        result = await transaction.wait()
+
         expect(await token.balanceOf(user1.address)).to.equal(amount);
       }) 
 
@@ -188,7 +187,7 @@ describe('Crowdsale', () => {
 
   })
 
-  describe('Finalzing Sale', () => {
+  describe('Finalizing Sale', () => {
     amount = tokens(10)
     value = ether(10)
 
@@ -226,6 +225,32 @@ describe('Crowdsale', () => {
 
     })
 
+  })
+
+  describe('Minimum and Maximum Contribution', () => {
+
+    it('Should reject contributions below the minimum purchase amount', async () => {
+      amount = tokens(0.5)
+      await expect(
+      crowdsale.connect(user1).buyTokens(amount, { value: ether(0.5) }) 
+      ).to.be.revertedWith('Minimum purchase is 1 token')
+    })
+
+    it('Should reject contributions above the maximum purchase amount', async () => {
+      amount = tokens(1001)
+      await expect(
+      crowdsale.connect(user1).buyTokens(amount, { value: ether(1001) })
+      ).to.be.revertedWith('Maximum purchase is 1000 tokens')
+    })
+
+    it('Should allow contributions within the valid range', async () => {
+      amount = tokens(500)
+      transaction = await crowdsale.connect(user1).buyTokens(amount, { value: ether(500) })
+      result = await transaction.wait()
+
+      expect(await token.balanceOf(user1.address)).to.equal(amount)
+      await expect(transaction).to.emit(crowdsale, 'Buy').withArgs(amount, user1.address)
+    })
   })
 
 })
