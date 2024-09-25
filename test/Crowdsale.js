@@ -1,5 +1,6 @@
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
+
 const tokens = (n) => {
   return ethers.utils.parseUnits(n.toString(), 'ether')
   }
@@ -7,7 +8,7 @@ const ether = tokens
 
 describe('Crowdsale', () => {
   // eslint-disable-next-line no-unused-vars
-  let token, crowdsale, currentTime, startTime, deployer, user1, user2, accounts, transaction, whitelist, result, amount, price, value
+  let token, crowdsale, currentTime, startTime, deployer, user1, user2, accounts, transaction, whitelist, result, amount, price, value, goal, endTime
 
   beforeEach(async () => {
     const Crowdsale = await ethers.getContractFactory('Crowdsale')
@@ -15,14 +16,16 @@ describe('Crowdsale', () => {
     const currentTime = (await ethers.provider.getBlock('latest')).timestamp
     
     startTime = currentTime - 60
+    endTime = currentTime + 3600
     token = await Token.deploy('Dapp University', 'DAPP', '1000000')
+    goal = ether(10) // Set the goal to 10 ETH
 
     accounts = await ethers.getSigners()
     deployer = accounts[0]
     user1 = accounts[1]
     user2 = accounts[2]
 
-    crowdsale = await Crowdsale.deploy(token.address, ether(1), '1000000', startTime)
+    crowdsale = await Crowdsale.deploy(token.address, ether(1), '1000000', startTime, goal, endTime)
 
     transaction = await token.connect(deployer).transfer(crowdsale.address, tokens(1000000))
     await transaction.wait()
@@ -137,6 +140,52 @@ describe('Crowdsale', () => {
       }) 
 
     })
+  })
+
+  describe('Refund Functionality', () => {
+
+    it('Should allow refunds if the goal is not reached after the end', async () => {
+      await crowdsale.connect(user1).buyTokens(tokens(5), { value: ether(5) })
+
+      await ethers.provider.send("evm_increaseTime", [3601])
+      await ethers.provider.send("evm_mine")
+
+      const beforeBalance = await ethers.provider.getBalance(user1.address)
+      transaction = await crowdsale.connect(user1).claimRefund()
+      result = await transaction.wait()
+
+      const afterBalance = await ethers.provider.getBalance(user1.address)
+      expect(afterBalance).to.be.gt(beforeBalance)
+    })
+
+    it('Should not allow refunds if the goal is met', async () => {
+      await crowdsale.connect(user1).buyTokens(tokens(10), { value: ether(10) })
+
+      await ethers.provider.send("evm_increaseTime", [3601])
+      await ethers.provider.send("evm_mine")
+
+      await expect(crowdsale.connect(user1).claimRefund()).to.be.revertedWith('Goal reached, refunds not available')
+    })
+
+    it('Should prevent refunds before the crowdsale ends', async () => {
+      await crowdsale.connect(user1).buyTokens(tokens(5), { value: ether(5) })
+      await expect(crowdsale.connect(user1).claimRefund()).to.be.revertedWith('Crowdsale is still ongoing')
+    })
+  })
+
+  describe('Finalizing Crowdsale', () => {
+
+    it('Should finalize the crowdsale and prevent further refunds if the goal is met', async () => {
+      await crowdsale.connect(user1).buyTokens(tokens(10), { value: ether(10) })
+      await ethers.provider.send("evm_increaseTime", [3601])
+      await ethers.provider.send("evm_mine")
+
+      transaction = await crowdsale.connect(deployer).finalizeCrowdsale()
+      result = await transaction.wait()
+
+      await expect(crowdsale.connect(user1).claimRefund()).to.be.revertedWith('Goal reached, refunds not available')
+    })
+
   })
 
   describe('Sending ETH', () => {

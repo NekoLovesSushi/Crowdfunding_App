@@ -13,8 +13,12 @@ contract Crowdsale {
     uint256 public startTime;
     uint256 public minPurchase = 1 * 1e18;
     uint256 public maxPurchase = 1000 * 1e18;
+    uint256 public goal; 
+    uint256 public endTime;
 
     mapping(address => bool) public whitelistedAddresses;
+    mapping(address => uint256) public contributions;
+
 
     event Buy(uint256 amount, address indexed buyer);
     event Finalize(uint256 tokensSold, uint256 ethRaised);
@@ -23,7 +27,9 @@ contract Crowdsale {
         Token _token,
         uint256 _price,
         uint256 _maxTokens,
-        uint256 _startTime
+        uint256 _startTime,
+        uint256 _goal,     
+        uint256 _endTime 
     ) 
     
     {
@@ -32,6 +38,8 @@ contract Crowdsale {
         price = _price;
         maxTokens = _maxTokens;
         startTime = _startTime; 
+        goal = _goal; 
+        endTime = _endTime;
     }
 
     modifier onlyOwner() {
@@ -68,17 +76,18 @@ contract Crowdsale {
 
     function buyTokens(uint256 _amount) public payable onlyWhitelisted onlyWhileOpen {
         uint256 requiredEth = (_amount * price) / 1e18;
-        console.log("Amount: %s, Required ETH: %s, Sent ETH: %s", _amount, requiredEth, msg.value);
         
         require(_amount >= minPurchase, "Minimum purchase is 1 token");
         require(_amount <= maxPurchase, "Maximum purchase is 1000 tokens");
         
+        require(block.timestamp <= endTime, "Crowdsale has ended");
         require(msg.value == requiredEth, "Incorrect ETH value sent");
         
         require(token.balanceOf(address(this)) >= _amount, "Not enough tokens available");
         require(token.transfer(msg.sender, _amount), "Token transfer failed");
 
         tokensSold += _amount;
+        contributions[msg.sender] += msg.value;
 
         emit Buy(_amount, msg.sender);
     }
@@ -96,4 +105,22 @@ contract Crowdsale {
 
         emit Finalize(tokensSold, value);
     }
+
+    function claimRefund() public {
+        require(block.timestamp > endTime, "Crowdsale is still ongoing");
+        require(address(this).balance < goal, "Goal reached, refunds not available");
+
+        uint256 contributed = contributions[msg.sender];
+        require(contributed > 0, "No contributions to refund");
+
+        contributions[msg.sender] = 0;
+        payable(msg.sender).transfer(contributed);
+    }
+
+    function finalizeCrowdsale() public onlyOwner {
+        require(block.timestamp > endTime, "Crowdsale has not ended yet");
+        require(address(this).balance >= goal, "Funding goal not reached");
+    }
+
+    
 }
