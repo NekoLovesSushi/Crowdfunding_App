@@ -1,12 +1,14 @@
+import { Container } from 'react-bootstrap';
+
 // Components
 import Navigation from './Navigation';
-import Buy from './Buy';
-import Progress from './Progress';
-import Info from './Info';
-import Loading from './Loading';
-function App() {
-    return(
 
-    )
+function App() {
+  return (
+    <Container>
+      <Navigation/>
+    </Container>
+  );
 }
+
 export default App;
