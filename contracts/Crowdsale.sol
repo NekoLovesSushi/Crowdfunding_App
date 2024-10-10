@@ -117,7 +117,7 @@ contract Crowdsale {
         payable(msg.sender).transfer(contributed);
     }
 
-    function finalizeCrowdsale() public view onlyOwner {
+    function finalizeCrowdsale() public onlyOwner {
         require(block.timestamp > endTime, "Crowdsale has not ended yet");
         require(address(this).balance >= goal, "Funding goal not reached");
     }

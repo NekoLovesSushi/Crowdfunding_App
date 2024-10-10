@@ -174,7 +174,6 @@ describe('Crowdsale', () => {
   })
 
   describe('Finalizing Crowdsale', () => {
-
     it('Should finalize the crowdsale and prevent further refunds if the goal is met', async () => {
       await crowdsale.connect(user1).buyTokens(tokens(10), { value: ether(10) })
       await ethers.provider.send("evm_increaseTime", [3601])
